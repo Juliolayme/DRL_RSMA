@@ -9,7 +9,7 @@ from maddpg import MADDPG
 # ══════════════════════════════════════════════
 CONFIG = {
     "episodes"    : 12000,   # số episode training
-    "steps"       : 50,     # số step mỗi episode
+    "steps"       : 1,     # số step mỗi episode
     "noise_start" : 0.5,     # noise ban đầu (exploration nhiều)
     "noise_end"   : 0.01,    # noise cuối (exploitation nhiều)
     "noise_decay" : 0.9997,  # tốc độ giảm noise
@@ -55,60 +55,45 @@ def train():
     # VÒNG LẶP TRAINING CHÍNH
     # ══════════════════════════════════════════
     for ep in range(1, CONFIG["episodes"] + 1):
-
+        # Mỗi episode = 1 kênh H mới hoàn toàn
         s1, s2 = env.reset()
-        ep_reward = 0.0
-        ep_R1     = 0.0
-        ep_R2     = 0.0
 
-        for step in range(CONFIG["steps"]):
+        # Chọn action
+        a1, a2 = agent.select_action(s1, s2,
+                                    noise_std=noise_std)
 
-            # ① Agent chọn action
-            a1, a2 = agent.select_action(s1, s2,
-                                         noise_std=noise_std)
+        # Tính reward
+        s1n, s2n, reward, R1, R2 = env.step(a1, a2)
 
-            # ② Tương tác với environment
-            s1n, s2n, reward, R1, R2 = env.step(a1, a2)
+        # Lưu experience
+        agent.buffer.push(s1, s2, a1, a2,
+                        reward, s1n, s2n)
 
-            # ③ Lưu experience vào buffer
-            agent.buffer.push(s1, s2, a1, a2,
-                               reward, s1n, s2n)
+        # Học nhiều lần từ buffer (quan trọng!)
+        loss_c = loss_a = None
+        for _ in range(10):   # ← 10 gradient updates per episode
+            lc, la = agent.learn()
+            if lc is not None:
+                loss_c, loss_a = lc, la
 
-            # ④ Học từ buffer
-            agent.learn()
+        reward_history.append(reward)
+        R1_history.append(R1)
+        R2_history.append(R2)
 
-            # Cập nhật state
-            s1, s2     = s1n, s2n
-            ep_reward += reward
-            ep_R1     += R1
-            ep_R2     += R2
-
-        # ── Tính trung bình mỗi episode ───────
-        avg_reward = ep_reward / CONFIG["steps"]
-        avg_R1     = ep_R1     / CONFIG["steps"]
-        avg_R2     = ep_R2     / CONFIG["steps"]
-
-        reward_history.append(avg_reward)
-        R1_history.append(avg_R1)
-        R2_history.append(avg_R2)
-
-        # ── Giảm noise theo thời gian ─────────
         noise_std = max(CONFIG["noise_end"],
                         noise_std * CONFIG["noise_decay"])
 
-        # ── Lưu model tốt nhất ────────────────
-        if avg_reward > best_reward:
-            best_reward = avg_reward
+        if ep > best_reward:
+            best_reward = reward
             agent.save("best_model")
 
-        # ── In kết quả ────────────────────────
         if ep % CONFIG["log_interval"] == 0:
             recent_avg = np.mean(reward_history[-200:])
             print(f"Ep {ep:5d} | "
-                f"Reward: {avg_reward:.3f} | "
-                f"R1: {avg_R1:.3f} | "
-                f"R2: {avg_R2:.3f} | "
-                f"Balance: {min(avg_R1,avg_R2)/max(avg_R1,avg_R2):.2f} | "  # ← thêm dòng này
+                f"Reward: {reward:.3f} | "
+                f"R1: {R1:.3f} | "
+                f"R2: {R2:.3f} | "
+                f"Balance: {min(R1,R2)/max(R1,R2+1e-6):.2f} | "
                 f"Avg200: {recent_avg:.3f} | "
                 f"Noise: {noise_std:.4f}")
 

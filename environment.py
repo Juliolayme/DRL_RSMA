@@ -48,7 +48,6 @@ class SISO_RSMA_Env:
         P1c, P1p = float(action1[0]), float(action1[1])
         P2c, P2p = float(action2[0]), float(action2[1])
 
-        # Tính reward với kênh hiện tại
         best_reward = -np.inf
         best_R1 = best_R2 = 0.0
         for o1 in [0, 1]:
@@ -59,15 +58,10 @@ class SISO_RSMA_Env:
                 if r > best_reward:
                     best_reward, best_R1, best_R2 = r, R1, R2
 
-        # FIX: sinh kênh MỚI sau mỗi step
-        # → next_state khác state → agent học được
-        self.h1 = self._gen_channel()
-        self.h2 = self._gen_channel()
-        self.g1 = self._gen_channel()
-        self.g2 = self._gen_channel()
-
-        s1_next, s2_next = self._get_states()
-        return s1_next, s2_next, best_reward, best_R1, best_R2
+        # Kênh KHÔNG đổi trong episode
+        # next_state = current_state (đúng với bài toán này)
+        s1, s2 = self._get_states()
+        return s1, s2, best_reward, best_R1, best_R2
 
     # ────────────────────────────────────────────
     # COMPUTE RATE: công thức Shannon với RSMA
