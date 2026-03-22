@@ -17,7 +17,7 @@ class MADDPG:
                  P_total     = 1.0,
                  hidden_dim  = 64,
                  lr_actor    = 1e-4,
-                 lr_critic   = 1e-3,
+                 lr_critic   = 5e-4,
                  gamma       = 0.99,
                  tau         = 0.005,
                  buffer_size = 15000,
@@ -112,16 +112,13 @@ class MADDPG:
     # LEARN (cập nhật networks từ replay buffer)
     # ══════════════════════════════════════════════
     def learn(self):
-        """Được gọi sau mỗi step, khi buffer đã đủ"""
         if not self.buffer.ready(self.batch_size):
-            return None, None   # chưa đủ data
+            return None, None
 
         # ── ① Sample batch ────────────────────────
         s1, s2, a1, a2, r, s1n, s2n = self.buffer.sample(
             self.batch_size
         )
-
-        # Chuyển sang tensor
         s1  = torch.FloatTensor(s1).to(self.device)
         s2  = torch.FloatTensor(s2).to(self.device)
         a1  = torch.FloatTensor(a1).to(self.device)
@@ -132,52 +129,56 @@ class MADDPG:
 
         # ── ② Cập nhật Critic ─────────────────────
         with torch.no_grad():
-            # Action tiếp theo từ target actor
             a1_next = self.actor1_target(s1n)
             a2_next = self.actor2_target(s2n)
+            q_next  = self.critic1_target(s1n, s2n,
+                                        a1_next, a2_next)
+            # FIX: dùng CÙNG target cho cả 2 critic
+            y = r + self.gamma * q_next
 
-            # Target Q từ target critic
-            q1_next = self.critic1_target(s1n, s2n,
-                                          a1_next, a2_next)
-            q2_next = self.critic2_target(s1n, s2n,
-                                          a1_next, a2_next)
+        q1 = self.critic1(s1, s2, a1, a2)
+        q2 = self.critic2(s1, s2, a1, a2)
 
-            # Bellman equation: y = r + γ * Q_target(s', a')
-            y = r + self.gamma * q1_next  # dùng chung reward
-
-        # Q hiện tại
-        q1_curr = self.critic1(s1, s2, a1, a2)
-        q2_curr = self.critic2(s1, s2, a1, a2)
-
-        # Loss = MSE(Q_hiện_tại, y)
-        loss_c1 = F.mse_loss(q1_curr, y)
-        loss_c2 = F.mse_loss(q2_curr, y)
+        loss_c1 = F.mse_loss(q1, y)
+        loss_c2 = F.mse_loss(q2, y)
 
         self.opt_critic1.zero_grad()
         loss_c1.backward()
+        # FIX: thêm gradient clipping
+        torch.nn.utils.clip_grad_norm_(
+            self.critic1.parameters(), max_norm=1.0)
         self.opt_critic1.step()
 
         self.opt_critic2.zero_grad()
         loss_c2.backward()
+        torch.nn.utils.clip_grad_norm_(
+            self.critic2.parameters(), max_norm=1.0)
         self.opt_critic2.step()
 
         # ── ③ Cập nhật Actor ──────────────────────
-        # Actor loss = -Q (muốn maximize Q)
         a1_pred = self.actor1(s1)
         a2_pred = self.actor2(s2)
 
-        loss_a1 = -self.critic1(s1, s2, a1_pred, a2.detach()).mean()
-        loss_a2 = -self.critic2(s1, s2, a1.detach(), a2_pred).mean()
+        # FIX: cả 2 actor đều dùng critic1 (shared critic)
+        # → đảm bảo cùng hướng tối ưu
+        loss_a1 = -self.critic1(
+            s1, s2, a1_pred, a2_pred.detach()).mean()
+        loss_a2 = -self.critic1(
+            s1, s2, a1_pred.detach(), a2_pred).mean()
 
         self.opt_actor1.zero_grad()
         loss_a1.backward()
+        torch.nn.utils.clip_grad_norm_(
+            self.actor1.parameters(), max_norm=1.0)
         self.opt_actor1.step()
 
         self.opt_actor2.zero_grad()
         loss_a2.backward()
+        torch.nn.utils.clip_grad_norm_(
+            self.actor2.parameters(), max_norm=1.0)
         self.opt_actor2.step()
 
-        # ── ④ Soft update target networks ─────────
+        # ── ④ Soft update ─────────────────────────
         self._soft_update(self.actor1,  self.actor1_target)
         self._soft_update(self.actor2,  self.actor2_target)
         self._soft_update(self.critic1, self.critic1_target)
