@@ -200,7 +200,7 @@ class MADDPG:
     def save(self, path="model"):
         torch.save(self.actor1.state_dict(),  f"{path}_a1.pth")
         torch.save(self.actor2.state_dict(),  f"{path}_a2.pth")
-        print(f"Đã lưu model vào {path}_a1.pth, {path}_a2.pth")
+        #print(f"Đã lưu model vào {path}_a1.pth, {path}_a2.pth")
 
     def load(self, path="model"):
         self.actor1.load_state_dict(
