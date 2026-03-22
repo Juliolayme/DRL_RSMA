@@ -12,7 +12,7 @@ CONFIG = {
     "steps"       : 200,     # số step mỗi episode
     "noise_start" : 0.3,     # noise ban đầu (exploration nhiều)
     "noise_end"   : 0.01,    # noise cuối (exploitation nhiều)
-    "noise_decay" : 0.9995,  # tốc độ giảm noise
+    "noise_decay" : 0.9998,  # tốc độ giảm noise
     "log_interval": 200,     # in kết quả mỗi N episode
     "save_interval": 2000,   # lưu model mỗi N episode
     "P_total"     : 1.0,
