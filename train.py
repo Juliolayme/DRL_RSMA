@@ -105,11 +105,12 @@ def train():
         if ep % CONFIG["log_interval"] == 0:
             recent_avg = np.mean(reward_history[-200:])
             print(f"Ep {ep:5d} | "
-                  f"Reward: {avg_reward:.3f} | "
-                  f"R1: {avg_R1:.3f} | "
-                  f"R2: {avg_R2:.3f} | "
-                  f"Avg200: {recent_avg:.3f} | "
-                  f"Noise: {noise_std:.4f}")
+                f"Reward: {avg_reward:.3f} | "
+                f"R1: {avg_R1:.3f} | "
+                f"R2: {avg_R2:.3f} | "
+                f"Balance: {min(avg_R1,avg_R2)/max(avg_R1,avg_R2):.2f} | "  # ← thêm dòng này
+                f"Avg200: {recent_avg:.3f} | "
+                f"Noise: {noise_std:.4f}")
 
         # ── Lưu model định kỳ ─────────────────
         if ep % CONFIG["save_interval"] == 0:
