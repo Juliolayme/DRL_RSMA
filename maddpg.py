@@ -16,10 +16,10 @@ class MADDPG:
                  action_dim  = 2,
                  P_total     = 1.0,
                  hidden_dim  = 64,
-                 lr_actor    = 1e-4,
-                 lr_critic   = 5e-4,
+                 lr_actor    = 3e-4,
+                 lr_critic   = 1e-3,
                  gamma       = 0.99,
-                 tau         = 0.005,
+                 tau         = 0.01,
                  buffer_size = 15000,
                  batch_size  = 128):
 

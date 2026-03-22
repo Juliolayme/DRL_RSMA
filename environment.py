@@ -45,28 +45,29 @@ class SISO_RSMA_Env:
     # STEP: nhận action, trả về reward
     # ────────────────────────────────────────────
     def step(self, action1, action2):
-        """
-        action1 = [P1c, P1p]: công suất BS1 (đã normalize, tổng = P_total)
-        action2 = [P2c, P2p]: công suất BS2 (đã normalize, tổng = P_total)
-        """
         P1c, P1p = float(action1[0]), float(action1[1])
         P2c, P2p = float(action2[0]), float(action2[1])
 
-        # Exhaustive search: thử 4 tổ hợp decoding order
-        # Chọn tổ hợp cho weighted sum-rate cao nhất
+        # Tính reward với kênh hiện tại
         best_reward = -np.inf
         best_R1 = best_R2 = 0.0
-
         for o1 in [0, 1]:
             for o2 in [0, 1]:
-                R1, R2 = self._compute_rate(P1c, P1p, P2c, P2p, o1, o2)
-                reward  = self.beta * R1 + (1 - self.beta) * R2
-                if reward > best_reward:
-                    best_reward = reward
-                    best_R1, best_R2 = R1, R2
+                R1, R2 = self._compute_rate(
+                    P1c, P1p, P2c, P2p, o1, o2)
+                r = self.beta*R1 + (1-self.beta)*R2
+                if r > best_reward:
+                    best_reward, best_R1, best_R2 = r, R1, R2
 
-        s1, s2 = self._get_states()
-        return s1, s2, best_reward, best_R1, best_R2
+        # FIX: sinh kênh MỚI sau mỗi step
+        # → next_state khác state → agent học được
+        self.h1 = self._gen_channel()
+        self.h2 = self._gen_channel()
+        self.g1 = self._gen_channel()
+        self.g2 = self._gen_channel()
+
+        s1_next, s2_next = self._get_states()
+        return s1_next, s2_next, best_reward, best_R1, best_R2
 
     # ────────────────────────────────────────────
     # COMPUTE RATE: công thức Shannon với RSMA
